@@ -1,0 +1,168 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { Schedule, WCMatch } from "@/lib/worldcup";
+import ScheduleView from "@/components/ScheduleView";
+import BracketView from "@/components/BracketView";
+import PredictPanel from "@/components/PredictPanel";
+
+type Tab = "groups" | "bracket";
+
+interface ScheduleResponse {
+  fetchedAt: string;
+  data: Schedule;
+}
+
+export default function Home() {
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("bracket");
+  const [selected, setSelected] = useState<WCMatch | null>(null);
+
+  const load = useCallback(async (refresh: boolean) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/schedule${refresh ? "?refresh=1" : ""}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to load schedule.");
+      const { fetchedAt, data } = json as ScheduleResponse;
+      setSchedule(data);
+      setFetchedAt(fetchedAt);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load schedule.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(false);
+  }, [load]);
+
+  const upcomingCount = schedule?.matches.filter((m) => m.predictable).length ?? 0;
+
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <span className="text-pitch-500">World Cup 2026</span> Predictor
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Live schedule &amp; bracket. Pick an upcoming match and predict it with Claude.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {fetchedAt && (
+            <span className="text-xs text-slate-500">
+              Updated {new Date(fetchedAt).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => load(true)}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-pitch-500/60 hover:bg-slate-800 disabled:opacity-60"
+          >
+            <span className={refreshing ? "animate-spin" : ""}>↻</span>
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </header>
+
+      <div className="mb-6 flex items-center gap-2">
+        <TabButton active={tab === "groups"} onClick={() => setTab("groups")}>
+          Groups
+        </TabButton>
+        <TabButton active={tab === "bracket"} onClick={() => setTab("bracket")}>
+          Bracket
+        </TabButton>
+        {upcomingCount > 0 && (
+          <span className="ml-2 rounded-full bg-pitch-500/15 px-2.5 py-1 text-xs text-pitch-500">
+            {upcomingCount} match{upcomingCount === 1 ? "" : "es"} to predict
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+          {error}
+          <button
+            type="button"
+            onClick={() => load(false)}
+            className="ml-3 underline hover:text-red-200"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {loading && !schedule ? (
+        <div className="flex items-center justify-center py-24 text-slate-400">
+          <span className="mr-3 animate-spin text-xl">↻</span> Loading schedule…
+        </div>
+      ) : schedule ? (
+        tab === "groups" ? (
+          <ScheduleView
+            groups={schedule.groups}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelected}
+          />
+        ) : (
+          <BracketView
+            knockout={schedule.knockout}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelected}
+          />
+        )
+      ) : null}
+
+      {selected && (
+        <PredictPanel match={selected} onClose={() => setSelected(null)} />
+      )}
+
+      <footer className="mt-12 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
+        Schedule data from the public{" "}
+        <a
+          href="https://github.com/openfootball/worldcup.json"
+          className="underline hover:text-slate-300"
+          target="_blank"
+          rel="noreferrer"
+        >
+          openfootball
+        </a>{" "}
+        dataset. Predictions generated by Claude.
+      </footer>
+    </main>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+        active
+          ? "bg-pitch-600 text-white"
+          : "border border-slate-800 bg-slate-900/50 text-slate-300 hover:bg-slate-800"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
