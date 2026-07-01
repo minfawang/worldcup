@@ -23,6 +23,46 @@ npm run dev
 
 Open http://localhost:3000.
 
+## Deploy to Vercel
+
+This is a standard Next.js app, so [Vercel](https://vercel.com) is the easiest host
+(free Hobby tier). You can deploy straight from the CLI — no GitHub repo required.
+
+### First-time setup
+
+```bash
+npm i -g vercel@latest        # the API requires a recent CLI version
+vercel login                  # authenticate
+vercel link --yes             # create/link the project (pass --scope <team> if prompted)
+```
+
+Add your secrets as Vercel environment variables (Production + Preview):
+
+```bash
+vercel env add ANTHROPIC_API_KEY production
+vercel env add ANTHROPIC_API_KEY preview
+```
+
+For durable, shared prediction storage, add an Upstash Redis database from the Vercel
+dashboard: **Project → Storage → Create Database → Upstash → Redis**, then link it to
+the project. Vercel auto-injects the connection env vars (`KV_REST_API_URL` /
+`KV_REST_API_TOKEN`, or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`) — both
+naming schemes are supported. Without it, predictions still work but aren't persisted
+across serverless instances.
+
+### Deploy / push updates
+
+```bash
+vercel deploy --prod --yes    # build + deploy to production
+```
+
+Run this again any time you want to push new changes to production. Environment-variable
+changes only take effect after the next deploy, so redeploy after adding/updating them.
+
+> Prefer git-based auto-deploys? Push the repo to GitHub, then import the project in the
+> Vercel dashboard and connect it to the repo — after that every `git push` deploys
+> automatically.
+
 ## Configuration
 
 | Variable | Required | Description |
