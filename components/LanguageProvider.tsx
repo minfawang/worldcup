@@ -9,8 +9,10 @@ import {
   useState,
 } from "react";
 import {
+  DEFAULT_LANG,
   DICT,
   LOCALE,
+  matchLang,
   translateGroup,
   translateRound,
   translateTeam,
@@ -32,15 +34,20 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 const STORAGE_KEY = "wc-lang";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  const [lang, setLangState] = useState<Lang>(DEFAULT_LANG);
 
   useEffect(() => {
+    // A saved manual choice always wins; otherwise auto-detect from the
+    // browser's ordered language preferences (falling back to English).
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === "en" || saved === "zh") {
       setLangState(saved);
-    } else if (navigator.language.toLowerCase().startsWith("zh")) {
-      setLangState("zh");
+      return;
     }
+    const tags = navigator.languages?.length
+      ? navigator.languages
+      : [navigator.language];
+    setLangState(matchLang(tags));
   }, []);
 
   useEffect(() => {

@@ -5,6 +5,28 @@ export const LANGS: { key: Lang; label: string }[] = [
   { key: "zh", label: "中文" },
 ];
 
+/** English is the default / fallback language. */
+export const DEFAULT_LANG: Lang = "en";
+
+/**
+ * Pick the best supported language from an ordered list of BCP-47 tags
+ * (e.g. navigator.languages: ["zh-CN", "en-US"]). Returns the first tag that
+ * maps to a supported language, falling back to English when nothing matches.
+ */
+export function matchLang(tags: readonly string[] | undefined): Lang {
+  if (!tags) return DEFAULT_LANG;
+  for (const tag of tags) {
+    const lower = tag.toLowerCase();
+    if (lower === "zh" || lower.startsWith("zh-") || lower.startsWith("zh_")) {
+      return "zh";
+    }
+    if (lower === "en" || lower.startsWith("en-") || lower.startsWith("en_")) {
+      return "en";
+    }
+  }
+  return DEFAULT_LANG;
+}
+
 export const LOCALE: Record<Lang, string> = {
   en: "en-US",
   zh: "zh-CN",
