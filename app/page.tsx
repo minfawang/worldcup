@@ -48,19 +48,27 @@ export default function Home() {
   const upcomingCount = schedule?.matches.filter((m) => m.predictable).length ?? 0;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            <span className="text-pitch-500">World Cup 2026</span> Predictor
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <header className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="animate-fade-in-up">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-pitch-300 backdrop-blur">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pitch-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-pitch-400" />
+            </span>
+            Live · Canada · USA · Mexico
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            <span className="text-gradient">World Cup 2026</span>
+            <span className="ml-2 font-light text-slate-400">Predictor</span>
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Live schedule &amp; bracket. Pick an upcoming match and predict it with Claude.
+          <p className="mt-2 max-w-md text-sm text-slate-400">
+            Live schedule &amp; bracket. Pick an upcoming match and let Claude call the scoreline.
           </p>
         </div>
         <div className="flex items-center gap-3">
           {fetchedAt && (
-            <span className="text-xs text-slate-500">
+            <span className="hidden text-xs text-slate-500 sm:inline">
               Updated {new Date(fetchedAt).toLocaleTimeString()}
             </span>
           )}
@@ -68,35 +76,40 @@ export default function Home() {
             type="button"
             onClick={() => load(true)}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-pitch-500/60 hover:bg-slate-800 disabled:opacity-60"
+            className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-slate-100 backdrop-blur transition hover:border-pitch-400/50 hover:shadow-glow disabled:opacity-60"
           >
-            <span className={refreshing ? "animate-spin" : ""}>↻</span>
+            <span className={`text-pitch-400 ${refreshing ? "animate-spin" : "transition group-hover:rotate-180"}`}>
+              ↻
+            </span>
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
         </div>
       </header>
 
-      <div className="mb-6 flex items-center gap-2">
-        <TabButton active={tab === "groups"} onClick={() => setTab("groups")}>
-          Groups
-        </TabButton>
-        <TabButton active={tab === "bracket"} onClick={() => setTab("bracket")}>
-          Bracket
-        </TabButton>
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <div className="glass inline-flex rounded-2xl p-1">
+          <TabButton active={tab === "groups"} onClick={() => setTab("groups")}>
+            Groups
+          </TabButton>
+          <TabButton active={tab === "bracket"} onClick={() => setTab("bracket")}>
+            Bracket
+          </TabButton>
+        </div>
         {upcomingCount > 0 && (
-          <span className="ml-2 rounded-full bg-pitch-500/15 px-2.5 py-1 text-xs text-pitch-500">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-pitch-400/25 bg-pitch-400/10 px-3 py-1.5 text-xs font-medium text-pitch-300 shadow-glow">
+            <span className="h-1.5 w-1.5 rounded-full bg-pitch-400" />
             {upcomingCount} match{upcomingCount === 1 ? "" : "es"} to predict
           </span>
         )}
       </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 backdrop-blur">
           {error}
           <button
             type="button"
             onClick={() => load(false)}
-            className="ml-3 underline hover:text-red-200"
+            className="ml-3 underline hover:text-red-100"
           >
             Retry
           </button>
@@ -104,34 +117,36 @@ export default function Home() {
       )}
 
       {loading && !schedule ? (
-        <div className="flex items-center justify-center py-24 text-slate-400">
-          <span className="mr-3 animate-spin text-xl">↻</span> Loading schedule…
+        <div className="flex items-center justify-center py-28 text-slate-400">
+          <span className="mr-3 animate-spin text-xl text-pitch-400">↻</span> Loading schedule…
         </div>
       ) : schedule ? (
-        tab === "groups" ? (
-          <ScheduleView
-            groups={schedule.groups}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelected}
-          />
-        ) : (
-          <BracketView
-            knockout={schedule.knockout}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelected}
-          />
-        )
+        <div key={tab} className="animate-fade-in-up">
+          {tab === "groups" ? (
+            <ScheduleView
+              groups={schedule.groups}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+            />
+          ) : (
+            <BracketView
+              knockout={schedule.knockout}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+            />
+          )}
+        </div>
       ) : null}
 
       {selected && (
         <PredictPanel match={selected} onClose={() => setSelected(null)} />
       )}
 
-      <footer className="mt-12 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
+      <footer className="mt-16 border-t border-white/5 pt-6 text-center text-xs text-slate-500">
         Schedule data from the public{" "}
         <a
           href="https://github.com/openfootball/worldcup.json"
-          className="underline hover:text-slate-300"
+          className="text-slate-400 underline-offset-2 hover:text-pitch-300 hover:underline"
           target="_blank"
           rel="noreferrer"
         >
@@ -156,10 +171,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+      className={`relative rounded-xl px-5 py-2 text-sm font-medium transition ${
         active
-          ? "bg-pitch-600 text-white"
-          : "border border-slate-800 bg-slate-900/50 text-slate-300 hover:bg-slate-800"
+          ? "bg-brand-gradient text-slate-950 shadow-glow"
+          : "text-slate-400 hover:text-slate-100"
       }`}
     >
       {children}

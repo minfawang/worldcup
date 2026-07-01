@@ -37,16 +37,21 @@ export default function BracketView({ knockout, selectedId, onSelect }: BracketV
   }
 
   return (
-    <div className="thin-scroll overflow-x-auto pb-3">
-      <div className="flex min-w-max gap-5">
-        {columns.map((round) => {
+    <div className="thin-scroll overflow-x-auto pb-4">
+      <div className="flex min-w-max gap-6">
+        {columns.map((round, idx) => {
           const matches = (byRound.get(round) ?? []).slice();
           return (
             <div key={round} className="flex w-64 shrink-0 flex-col">
-              <h3 className="mb-3 text-center text-sm font-semibold uppercase tracking-wide text-pitch-500">
-                {round}
-              </h3>
-              <div className="flex flex-1 flex-col justify-around gap-3">
+              <div className="mb-4 flex items-center justify-center">
+                <span className="glass inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-slate-200">
+                  <span className="grid h-4 w-4 place-items-center rounded-full bg-brand-gradient text-[9px] font-bold text-slate-950">
+                    {idx + 1}
+                  </span>
+                  {round}
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col justify-around gap-4">
                 {matches.map((m) => (
                   <MatchCard
                     key={m.id}

@@ -4,24 +4,48 @@
 
 :root {
   color-scheme: dark;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
 }
 
-body {
-  @apply bg-slate-950 text-slate-100 antialiased;
-  background-image:
-    radial-gradient(60rem 60rem at 85% -10%, rgba(34, 197, 94, 0.12), transparent),
-    radial-gradient(50rem 50rem at 0% 0%, rgba(59, 130, 246, 0.1), transparent);
-  background-attachment: fixed;
+@layer base {
+  body {
+    @apply bg-[#05070e] text-slate-200 antialiased;
+    font-family: var(--font-body);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
 }
 
-/* Thin scrollbars for horizontal bracket scroll */
-.thin-scroll::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+@layer components {
+  /* Frosted glass surface */
+  .glass {
+    @apply border border-white/10 bg-white/[0.04] backdrop-blur-xl;
+  }
+  .glass-strong {
+    @apply border border-white/10 bg-slate-950/70 backdrop-blur-2xl;
+  }
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-brand-gradient bg-clip-text text-transparent;
+  }
 }
-.thin-scroll::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-700;
-}
-.thin-scroll::-webkit-scrollbar-track {
-  background: transparent;
+
+@layer utilities {
+  .thin-scroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-white/10;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
+  }
+  .thin-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }

@@ -23,11 +23,12 @@ interface TeamRowProps {
 }
 
 function TeamRow({ name, placeholder, score, isWinner, emphasize }: TeamRowProps) {
+  const dim = emphasize && !isWinner && score != null;
   return (
     <div className="flex items-center justify-between gap-2">
       <span
         className={`flex min-w-0 items-center gap-2 ${
-          emphasize && isWinner ? "font-semibold text-white" : "text-slate-200"
+          emphasize && isWinner ? "font-semibold text-white" : dim ? "text-slate-400" : "text-slate-200"
         }`}
       >
         <span className="text-lg leading-none">{placeholder ? "❔" : flagFor(name)}</span>
@@ -35,8 +36,10 @@ function TeamRow({ name, placeholder, score, isWinner, emphasize }: TeamRowProps
       </span>
       {score != null && (
         <span
-          className={`tabular-nums ${
-            emphasize && isWinner ? "font-bold text-white" : "text-slate-300"
+          className={`flex h-6 w-6 items-center justify-center rounded-md text-xs tabular-nums ${
+            emphasize && isWinner
+              ? "bg-brand-gradient font-bold text-slate-950"
+              : "bg-white/5 text-slate-300"
           }`}
         >
           {score}
@@ -64,26 +67,30 @@ export default function MatchCard({ match, selected, onSelect }: MatchCardProps)
       type="button"
       disabled={!clickable}
       onClick={() => clickable && onSelect(match)}
-      className={`group w-full rounded-xl border p-3 text-left text-sm transition ${
+      className={`group relative w-full overflow-hidden rounded-2xl border p-3.5 text-left text-sm transition duration-200 ${
         selected
-          ? "border-pitch-500 bg-pitch-500/10 ring-1 ring-pitch-500"
-          : "border-slate-800 bg-slate-900/60"
+          ? "border-pitch-400/60 bg-pitch-400/[0.07] shadow-glow"
+          : "border-white/[0.07] bg-white/[0.03]"
       } ${
         clickable
-          ? "cursor-pointer hover:border-pitch-500/70 hover:bg-slate-800/70"
-          : "cursor-default"
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-pitch-400/50 hover:bg-white/[0.06] hover:shadow-glow"
+          : "cursor-default opacity-95"
       }`}
     >
-      <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+      {match.predictable && (
+        <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pitch-400/70 to-transparent" />
+      )}
+      <div className="mb-2.5 flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.15em] text-slate-500">
         <span>{formatKickoff(match)}</span>
         {played ? (
-          <span className="rounded bg-slate-700/70 px-1.5 py-0.5 text-slate-200">FT</span>
+          <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-slate-300">FT</span>
         ) : match.predictable ? (
-          <span className="rounded bg-pitch-500/20 px-1.5 py-0.5 text-pitch-500">
-            Predict →
+          <span className="inline-flex items-center gap-1 rounded-md bg-pitch-400/15 px-1.5 py-0.5 text-pitch-300 transition group-hover:bg-pitch-400/25">
+            Predict
+            <span className="transition group-hover:translate-x-0.5">→</span>
           </span>
         ) : (
-          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-500">TBD</span>
+          <span className="rounded-md bg-white/[0.03] px-1.5 py-0.5 text-slate-600">TBD</span>
         )}
       </div>
 
@@ -105,7 +112,7 @@ export default function MatchCard({ match, selected, onSelect }: MatchCardProps)
       </div>
 
       {match.ground && (
-        <div className="mt-2 truncate text-[11px] text-slate-500">{match.ground}</div>
+        <div className="mt-2.5 truncate text-[11px] text-slate-500">{match.ground}</div>
       )}
     </button>
   );
