@@ -42,4 +42,7 @@ Open http://localhost:3000.
 ## Notes
 
 - The schedule cache lives in the server process; restarting `npm run dev` clears it.
+- Predictions are cached in memory and persisted to `.data/predictions.json`, so they
+  survive server restarts. Delete that file to clear saved predictions. (This is a
+  local/single-instance store; for multi-instance deploys use a shared DB or Redis.)
 - Exact Claude model IDs are configurable via env so they can be updated as new models ship.
