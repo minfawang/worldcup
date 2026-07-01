@@ -2,11 +2,12 @@
 
 import type { WCMatch } from "@/lib/worldcup";
 import { flagFor } from "@/lib/flags";
+import { useLanguage } from "@/components/LanguageProvider";
 
-function formatKickoff(match: WCMatch): string {
+function formatKickoff(match: WCMatch, locale: string): string {
   if (!match.kickoffUtc) return match.date || "TBD";
   const d = new Date(match.kickoffUtc);
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(locale, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -23,6 +24,7 @@ interface TeamRowProps {
 }
 
 function TeamRow({ name, placeholder, score, isWinner, emphasize }: TeamRowProps) {
+  const { team } = useLanguage();
   const dim = emphasize && !isWinner && score != null;
   return (
     <div className="flex items-center justify-between gap-2">
@@ -32,7 +34,7 @@ function TeamRow({ name, placeholder, score, isWinner, emphasize }: TeamRowProps
         }`}
       >
         <span className="text-lg leading-none">{placeholder ? "❔" : flagFor(name)}</span>
-        <span className="truncate">{name}</span>
+        <span className="truncate">{placeholder ? name : team(name)}</span>
       </span>
       {score != null && (
         <span
@@ -56,6 +58,7 @@ interface MatchCardProps {
 }
 
 export default function MatchCard({ match, selected, onSelect }: MatchCardProps) {
+  const { t, locale } = useLanguage();
   const played = match.status === "played";
   const team1Wins = played && (match.score1 ?? 0) > (match.score2 ?? 0);
   const team2Wins = played && (match.score2 ?? 0) > (match.score1 ?? 0);
@@ -81,16 +84,16 @@ export default function MatchCard({ match, selected, onSelect }: MatchCardProps)
         <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pitch-400/70 to-transparent" />
       )}
       <div className="mb-2.5 flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.15em] text-slate-500">
-        <span>{formatKickoff(match)}</span>
+        <span>{formatKickoff(match, locale)}</span>
         {played ? (
-          <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-slate-300">FT</span>
+          <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-slate-300">{t("ft")}</span>
         ) : match.predictable ? (
           <span className="inline-flex items-center gap-1 rounded-md bg-pitch-400/15 px-1.5 py-0.5 text-pitch-300 transition group-hover:bg-pitch-400/25">
-            Predict
+            {t("predict")}
             <span className="transition group-hover:translate-x-0.5">→</span>
           </span>
         ) : (
-          <span className="rounded-md bg-white/[0.03] px-1.5 py-0.5 text-slate-600">TBD</span>
+          <span className="rounded-md bg-white/[0.03] px-1.5 py-0.5 text-slate-600">{t("tbd")}</span>
         )}
       </div>
 

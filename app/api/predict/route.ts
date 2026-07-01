@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSchedule } from "@/lib/scheduleCache";
 import { isModelKey, resolveModel } from "@/lib/models";
 import { getPrediction, setPrediction } from "@/lib/predictionCache";
+import { LANG_NAME, type Lang } from "@/lib/i18n";
 import { findMatch, type Schedule, type WCMatch } from "@/lib/worldcup";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 interface PredictBody {
   matchId?: number;
   model?: string;
+  lang?: string;
 }
 
 function recentForm(schedule: Schedule, team: string, exceptId: number): string {
@@ -36,12 +38,13 @@ function recentForm(schedule: Schedule, team: string, exceptId: number): string 
     .join("; ");
 }
 
-function buildPrompt(schedule: Schedule, match: WCMatch): string {
+function buildPrompt(schedule: Schedule, match: WCMatch, lang: Lang): string {
   const stageLabel = match.stage === "group" ? `group stage (${match.group})` : match.round;
   const knockoutNote =
     match.stage === "knockout"
       ? "\nThis is a knockout match, so it cannot end in a draw. If regulation time is level, decide the winner via extra time or a penalty shootout and say so in your reasoning (the winner field must be a team, not \"Draw\")."
       : "";
+  const langNote = `\nWrite the "reasoning" field in ${LANG_NAME[lang]}. Keep the "winner" field exactly as one of the provided team-name options (do not translate it).`;
 
   return [
     `You are a football (soccer) analyst predicting a 2026 FIFA World Cup match.`,
@@ -54,6 +57,7 @@ function buildPrompt(schedule: Schedule, match: WCMatch): string {
     `- ${match.team1}: ${recentForm(schedule, match.team1, match.id)}`,
     `- ${match.team2}: ${recentForm(schedule, match.team2, match.id)}`,
     knockoutNote,
+    langNote,
     ``,
     `Predict the final scoreline and explain your reasoning in 3-5 sentences,`,
     `referencing team strengths, form, and any tactical factors. Then submit your`,
@@ -79,10 +83,11 @@ export async function POST(request: Request) {
     );
   }
   const modelKey = body.model;
+  const lang: Lang = body.lang === "zh" ? "zh" : "en";
 
-  // Return a previously computed prediction for this match + model without
-  // calling Claude again.
-  const cachedPrediction = getPrediction(body.matchId, modelKey);
+  // Return a previously computed prediction for this match + model + language
+  // without calling Claude again.
+  const cachedPrediction = getPrediction(body.matchId, modelKey, lang);
   if (cachedPrediction) {
     return NextResponse.json({ ...cachedPrediction, cached: true });
   }
@@ -167,7 +172,7 @@ export async function POST(request: Request) {
         },
       ],
       tool_choice: { type: "tool", name: "submit_prediction" },
-      messages: [{ role: "user", content: buildPrompt(schedule, match) }],
+      messages: [{ role: "user", content: buildPrompt(schedule, match, lang) }],
     });
 
     const toolUse = response.content.find(
@@ -197,7 +202,7 @@ export async function POST(request: Request) {
       prediction,
     };
 
-    setPrediction(match.id, modelKey, result);
+    setPrediction(match.id, modelKey, lang, result);
 
     return NextResponse.json({ ...result, cached: false });
   } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { WCMatch } from "@/lib/worldcup";
+import { useLanguage } from "@/components/LanguageProvider";
 import MatchCard from "./MatchCard";
 
 const ROUND_ORDER = [
@@ -19,6 +20,7 @@ interface BracketViewProps {
 }
 
 export default function BracketView({ knockout, selectedId, onSelect }: BracketViewProps) {
+  const { t, round: roundName } = useLanguage();
   const byRound = new Map<string, WCMatch[]>();
   for (const m of knockout) {
     const list = byRound.get(m.round) ?? [];
@@ -31,7 +33,7 @@ export default function BracketView({ knockout, selectedId, onSelect }: BracketV
   if (columns.length === 0) {
     return (
       <p className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 text-center text-slate-400">
-        The knockout bracket has not been drawn yet.
+        {t("bracketEmpty")}
       </p>
     );
   }
@@ -48,7 +50,7 @@ export default function BracketView({ knockout, selectedId, onSelect }: BracketV
                   <span className="grid h-4 w-4 place-items-center rounded-full bg-brand-gradient text-[9px] font-bold text-slate-950">
                     {idx + 1}
                   </span>
-                  {round}
+                  {roundName(round)}
                 </span>
               </div>
               <div className="flex flex-1 flex-col justify-around gap-4">

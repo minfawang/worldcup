@@ -2,6 +2,7 @@
 
 import type { Group, WCMatch } from "@/lib/worldcup";
 import { flagFor } from "@/lib/flags";
+import { useLanguage } from "@/components/LanguageProvider";
 import MatchCard from "./MatchCard";
 
 interface GroupCardProps {
@@ -11,6 +12,7 @@ interface GroupCardProps {
 }
 
 function GroupCard({ group, selectedId, onSelect }: GroupCardProps) {
+  const { t, team, group: groupName } = useLanguage();
   return (
     <div className="glass flex flex-col rounded-3xl p-5 shadow-card transition duration-300 hover:border-white/20">
       <div className="mb-4 flex items-center gap-2">
@@ -18,17 +20,17 @@ function GroupCard({ group, selectedId, onSelect }: GroupCardProps) {
           {group.name.replace(/[^A-Z]/g, "")}
         </span>
         <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-slate-300">
-          {group.name}
+          {groupName(group.name)}
         </h3>
       </div>
 
       <table className="mb-5 w-full text-xs">
         <thead>
           <tr className="text-[10px] uppercase tracking-wider text-slate-500">
-            <th className="pb-2 text-left font-medium">Team</th>
-            <th className="pb-2 text-center font-medium">P</th>
-            <th className="pb-2 text-center font-medium">GD</th>
-            <th className="pb-2 text-center font-medium">Pts</th>
+            <th className="pb-2 text-left font-medium">{t("teamCol")}</th>
+            <th className="pb-2 text-center font-medium">{t("pCol")}</th>
+            <th className="pb-2 text-center font-medium">{t("gdCol")}</th>
+            <th className="pb-2 text-center font-medium">{t("ptsCol")}</th>
           </tr>
         </thead>
         <tbody>
@@ -42,7 +44,7 @@ function GroupCard({ group, selectedId, onSelect }: GroupCardProps) {
                   className={`h-4 w-0.5 rounded-full ${i < 2 ? "bg-brand-gradient" : "bg-white/10"}`}
                 />
                 <span>{flagFor(s.team)}</span>
-                <span className="truncate">{s.team}</span>
+                <span className="truncate">{team(s.team)}</span>
               </td>
               <td className="text-center tabular-nums">{s.played}</td>
               <td className="text-center tabular-nums">
@@ -56,7 +58,7 @@ function GroupCard({ group, selectedId, onSelect }: GroupCardProps) {
           {group.standings.length === 0 && (
             <tr>
               <td colSpan={4} className="py-2 text-slate-500">
-                Teams TBD
+                {t("teamsTbd")}
               </td>
             </tr>
           )}

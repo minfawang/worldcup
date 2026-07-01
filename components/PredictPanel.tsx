@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { WCMatch } from "@/lib/worldcup";
 import { MODEL_LIST, type ModelKey } from "@/lib/models";
 import { flagFor } from "@/lib/flags";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface Prediction {
   score1: number;
@@ -27,13 +28,20 @@ interface PredictPanelProps {
 }
 
 export default function PredictPanel({ match, onClose }: PredictPanelProps) {
+  const { t, lang, team, round, group } = useLanguage();
   const [model, setModel] = useState<ModelKey>("sonnet");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Keep results per model so toggling between them reuses what we already have.
-  const [results, setResults] = useState<Partial<Record<ModelKey, PredictResponse>>>({});
+  // Keep results per model + language so toggling reuses what we already have.
+  const [results, setResults] = useState<Record<string, PredictResponse>>({});
 
-  const result = results[model] ?? null;
+  const resultKey = `${model}:${lang}`;
+  const result = results[resultKey] ?? null;
+
+  const modelDesc: Record<ModelKey, string> = {
+    sonnet: t("sonnetDesc"),
+    opus: t("opusDesc"),
+  };
 
   async function runPrediction() {
     setLoading(true);
@@ -42,13 +50,13 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
       const res = await fetch("/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchId: match.id, model }),
+        body: JSON.stringify({ matchId: match.id, model, lang }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Prediction failed.");
       }
-      setResults((prev) => ({ ...prev, [model]: data as PredictResponse }));
+      setResults((prev) => ({ ...prev, [resultKey]: data as PredictResponse }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Prediction failed.");
     } finally {
@@ -75,15 +83,15 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-pitch-300">
-                {match.stage === "group" ? match.group : match.round}
+                {match.stage === "group" ? group(match.group) : round(match.round)}
               </p>
               <h2 className="mt-2 flex flex-wrap items-center gap-x-2 text-xl font-semibold text-white">
                 <span className="whitespace-nowrap">
-                  {flagFor(match.team1)} {match.team1}
+                  {flagFor(match.team1)} {team(match.team1)}
                 </span>
-                <span className="text-sm font-light text-slate-500">vs</span>
+                <span className="text-sm font-light text-slate-500">{t("vs")}</span>
                 <span className="whitespace-nowrap">
-                  {flagFor(match.team2)} {match.team2}
+                  {flagFor(match.team2)} {team(match.team2)}
                 </span>
               </h2>
             </div>
@@ -101,7 +109,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
         <div className="p-6">
           <div className="mb-5">
             <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.15em] text-slate-500">
-              Model
+              {t("model")}
             </p>
             <div className="grid grid-cols-2 gap-3">
               {MODEL_LIST.map((m) => (
@@ -124,7 +132,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
                     />
                     {m.label}
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">{m.description}</div>
+                  <div className="mt-1 text-xs text-slate-400">{modelDesc[m.key]}</div>
                 </button>
               ))}
             </div>
@@ -139,18 +147,16 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="animate-spin">↻</span> Predicting…
+                  <span className="animate-spin">↻</span> {t("predicting")}
                 </span>
               ) : (
-                "预测 / Predict result"
+                t("predictBtn")
               )}
             </button>
           )}
 
           {result?.cached && (
-            <p className="text-center text-[11px] text-slate-500">
-              Showing a saved prediction for this match &amp; model.
-            </p>
+            <p className="text-center text-[11px] text-slate-500">{t("savedNote")}</p>
           )}
 
           {error && (
@@ -165,7 +171,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
                 <div className="flex items-center justify-center gap-5 text-center">
                   <div className="flex-1">
                     <div className="text-3xl">{flagFor(result.team1)}</div>
-                    <div className="mt-1 truncate text-xs text-slate-400">{result.team1}</div>
+                    <div className="mt-1 truncate text-xs text-slate-400">{team(result.team1)}</div>
                   </div>
                   <div className="text-4xl font-bold tabular-nums text-white">
                     <span className="text-gradient">{result.prediction.score1}</span>
@@ -174,21 +180,21 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
                   </div>
                   <div className="flex-1">
                     <div className="text-3xl">{flagFor(result.team2)}</div>
-                    <div className="mt-1 truncate text-xs text-slate-400">{result.team2}</div>
+                    <div className="mt-1 truncate text-xs text-slate-400">{team(result.team2)}</div>
                   </div>
                 </div>
                 <p className="mt-4 text-center text-sm">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-pitch-400/25 bg-pitch-400/10 px-3 py-1 text-pitch-300">
                     {result.prediction.winner === "Draw"
-                      ? "Predicted draw"
-                      : `Winner: ${result.prediction.winner}`}
+                      ? t("drawText")
+                      : `${t("winnerPrefix")}${team(result.prediction.winner)}`}
                   </span>
                 </p>
               </div>
 
               <div>
                 <div className="mb-1.5 flex items-center justify-between text-xs text-slate-400">
-                  <span className="uppercase tracking-[0.15em]">Confidence</span>
+                  <span className="uppercase tracking-[0.15em]">{t("confidence")}</span>
                   <span className="tabular-nums text-slate-200">
                     {result.prediction.confidence}%
                   </span>
@@ -205,7 +211,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
 
               <div>
                 <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.15em] text-slate-500">
-                  Reasoning
+                  {t("reasoning")}
                 </p>
                 <p className="text-sm leading-relaxed text-slate-200">
                   {result.prediction.reasoning}
@@ -213,7 +219,9 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
               </div>
 
               <p className="text-right text-[11px] text-slate-500">
-                via {result.model.label} ({result.model.id})
+                {t("viaPrefix")}
+                {result.model.label} ({result.model.id})
+                {t("viaSuffix")}
               </p>
             </div>
           )}

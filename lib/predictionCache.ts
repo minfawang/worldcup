@@ -1,4 +1,5 @@
 import type { ModelKey } from "./models";
+import type { Lang } from "./i18n";
 
 export interface PredictionResult {
   matchId: number;
@@ -27,21 +28,23 @@ function store(): Map<string, PredictionResult> {
   return globalCache.__wcPredictions;
 }
 
-function keyFor(matchId: number, model: ModelKey): string {
-  return `${matchId}:${model}`;
+function keyFor(matchId: number, model: ModelKey, lang: Lang): string {
+  return `${matchId}:${model}:${lang}`;
 }
 
 export function getPrediction(
   matchId: number,
   model: ModelKey,
+  lang: Lang,
 ): PredictionResult | undefined {
-  return store().get(keyFor(matchId, model));
+  return store().get(keyFor(matchId, model, lang));
 }
 
 export function setPrediction(
   matchId: number,
   model: ModelKey,
+  lang: Lang,
   result: PredictionResult,
 ): void {
-  store().set(keyFor(matchId, model), result);
+  store().set(keyFor(matchId, model, lang), result);
 }

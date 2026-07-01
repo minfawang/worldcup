@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LanguageProvider } from "@/components/LanguageProvider";
 
 export const metadata: Metadata = {
   title: "World Cup Predictor 2026",
@@ -33,7 +34,7 @@ export default function RootLayout({
           <div className="absolute -right-40 top-1/3 h-[32rem] w-[32rem] rounded-full bg-neon-500/20 blur-[120px] animate-drift [animation-delay:-6s]" />
           <div className="absolute bottom-0 left-1/3 h-[28rem] w-[28rem] rounded-full bg-indigo-500/10 blur-[120px] animate-drift [animation-delay:-3s]" />
         </div>
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );
