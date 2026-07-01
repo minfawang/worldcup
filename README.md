@@ -30,6 +30,8 @@ Open http://localhost:3000.
 | `ANTHROPIC_API_KEY` | For predictions | Your Anthropic API key. The schedule works without it. |
 | `CLAUDE_SONNET_MODEL` | No | Override the Sonnet model ID (default in `lib/models.ts`). |
 | `CLAUDE_OPUS_MODEL` | No | Override the Opus model ID (default in `lib/models.ts`). |
+| `UPSTASH_REDIS_REST_URL` | For durable predictions | Upstash Redis REST URL. Enables shared, persistent prediction storage on Vercel. |
+| `UPSTASH_REDIS_REST_TOKEN` | For durable predictions | Upstash Redis REST token (pairs with the URL above). |
 
 ## How it works
 
@@ -42,7 +44,9 @@ Open http://localhost:3000.
 ## Notes
 
 - The schedule cache lives in the server process; restarting `npm run dev` clears it.
-- Predictions are cached in memory and persisted to `.data/predictions.json`, so they
-  survive server restarts. Delete that file to clear saved predictions. (This is a
-  local/single-instance store; for multi-instance deploys use a shared DB or Redis.)
+- Predictions are cached in memory and persisted to a durable backend:
+  - When `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` are set, they are stored
+    in Upstash Redis (shared across instances, survives restarts — use this on Vercel).
+  - Otherwise they fall back to `.data/predictions.json` (local single-instance store;
+    delete that file to clear saved predictions).
 - Exact Claude model IDs are configurable via env so they can be updated as new models ship.

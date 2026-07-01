@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ cached: false }, { status: 200 });
   }
 
-  const cached = getPrediction(matchId, model, lang);
+  const cached = await getPrediction(matchId, model, lang);
   if (cached) {
     return NextResponse.json({ ...cached, cached: true });
   }
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
 
   // Return a previously computed prediction for this match + model + language
   // without calling Claude again.
-  const cachedPrediction = getPrediction(body.matchId, modelKey, lang);
+  const cachedPrediction = await getPrediction(body.matchId, modelKey, lang);
   if (cachedPrediction) {
     return NextResponse.json({ ...cachedPrediction, cached: true });
   }
@@ -400,7 +400,7 @@ export async function POST(request: Request) {
           sources: Array.from(sources.values()).slice(0, 8),
         };
 
-        setPrediction(match.id, modelKey, lang, result);
+        await setPrediction(match.id, modelKey, lang, result);
 
         send({ type: "result", result: { ...result, cached: false } });
       } catch (err) {
