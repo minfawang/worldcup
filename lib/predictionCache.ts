@@ -105,6 +105,43 @@ function keyFor(matchId: number, model: ModelKey, lang: Lang): string {
   return `${matchId}:${model}:${lang}`;
 }
 
+// The model occasionally returns keyFactors as a single string instead of an
+// array, and sometimes packs several factors into one string using <item>...
+// </item> tags. Normalize any of these shapes into a clean string[] so the UI
+// always renders one bullet per factor. Applied on both write and read so
+// previously cached (mis-shaped) predictions are repaired on display too.
+export function normalizeKeyFactors(raw: unknown): string[] | undefined {
+  const source = Array.isArray(raw)
+    ? raw.filter((f): f is string => typeof f === "string")
+    : typeof raw === "string"
+      ? [raw]
+      : [];
+
+  const factors: string[] = [];
+  for (const entry of source) {
+    const matches = [...entry.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+    if (matches.length > 0) {
+      for (const m of matches) {
+        const text = m[1].trim();
+        if (text) factors.push(text);
+      }
+    } else {
+      // No wrapping tags: strip any stray tags and keep the plain text.
+      const text = entry.replace(/<\/?item>/gi, "").trim();
+      if (text) factors.push(text);
+    }
+  }
+
+  return factors.length > 0 ? factors : undefined;
+}
+
+// Apply keyFactors normalization to a stored/loaded prediction in place-safe
+// manner, returning the same object with cleaned keyFactors.
+function normalizePrediction(result: PredictionResult): PredictionResult {
+  const keyFactors = normalizeKeyFactors(result.prediction?.keyFactors);
+  return { ...result, prediction: { ...result.prediction, keyFactors } };
+}
+
 export async function getPrediction(
   matchId: number,
   model: ModelKey,
@@ -120,8 +157,9 @@ export async function getPrediction(
       // @upstash/redis serializes/deserializes JSON automatically.
       const value = await client.get<PredictionResult>(REDIS_KEY_PREFIX + key);
       if (value) {
-        map.set(key, value);
-        return value;
+        const normalized = normalizePrediction(value);
+        map.set(key, normalized);
+        return normalized;
       }
     } catch (err) {
       console.error("Failed to read prediction from Redis:", err);
@@ -130,7 +168,8 @@ export async function getPrediction(
   }
 
   ensureFileLoaded(map);
-  return map.get(key);
+  const local = map.get(key);
+  return local ? normalizePrediction(local) : undefined;
 }
 
 export async function setPrediction(
@@ -141,7 +180,9 @@ export async function setPrediction(
 ): Promise<void> {
   const key = keyFor(matchId, model, lang);
   const map = memory();
-  map.set(key, result);
+  const normalized = normalizePrediction(result);
+  result = normalized;
+  map.set(key, normalized);
 
   const client = redis();
   if (client) {

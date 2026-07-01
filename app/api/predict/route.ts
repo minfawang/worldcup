@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSchedule } from "@/lib/scheduleCache";
 import { isModelKey, resolveModel } from "@/lib/models";
-import { getPrediction, setPrediction } from "@/lib/predictionCache";
+import { getPrediction, setPrediction, normalizeKeyFactors } from "@/lib/predictionCache";
 import { LANG_NAME, type Lang } from "@/lib/i18n";
 import { findMatch, type Schedule, type WCMatch } from "@/lib/worldcup";
 
@@ -381,13 +381,9 @@ export async function POST(request: Request) {
           keyFactors?: unknown;
         };
 
-        // The model occasionally returns keyFactors as a single string instead
-        // of an array; normalize so the client can always treat it as string[].
-        const keyFactors = Array.isArray(raw.keyFactors)
-          ? raw.keyFactors.filter((f): f is string => typeof f === "string")
-          : typeof raw.keyFactors === "string" && raw.keyFactors.trim()
-            ? [raw.keyFactors.trim()]
-            : undefined;
+        // Normalize keyFactors into a clean string[] (handles single-string and
+        // <item>-tag-packed shapes the model sometimes returns).
+        const keyFactors = normalizeKeyFactors(raw.keyFactors);
 
         const prediction = { ...raw, keyFactors };
 
