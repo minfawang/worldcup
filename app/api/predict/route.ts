@@ -63,7 +63,7 @@ function buildPrompt(schedule: Schedule, match: WCMatch, lang: Lang): string {
     match.stage === "knockout"
       ? "\nThis is a knockout match, so it cannot end in a draw. If regulation time is level, decide the winner via extra time or a penalty shootout and say so in your reasoning (the winner field must be a team, not \"Draw\")."
       : "";
-  const langNote = `\nWrite the "reasoning" field in ${LANG_NAME[lang]}. Keep the "winner" field exactly as one of the provided team-name options (do not translate it).`;
+  const langNote = `\nWrite every free-text field ("reasoning", "headToHead", "keyPlayers1", "keyPlayers2", and each item of "keyFactors") in ${LANG_NAME[lang]}. Keep the "winner" field exactly as one of the provided team-name options (do not translate it).`;
 
   return [
     `You are a football (soccer) analyst predicting a 2026 FIFA World Cup match.`,
@@ -72,16 +72,52 @@ function buildPrompt(schedule: Schedule, match: WCMatch, lang: Lang): string {
     `Stage: ${stageLabel}`,
     `Date: ${match.date} at ${match.ground || "TBD"}`,
     ``,
-    `Recent tournament form:`,
+    `Recent tournament form (from this tournament's played matches):`,
     `- ${match.team1}: ${recentForm(schedule, match.team1, match.id)}`,
     `- ${match.team2}: ${recentForm(schedule, match.team2, match.id)}`,
+    ``,
+    `Use the web_search tool to research current, real-world information before predicting. Search for:`,
+    `- The latest FIFA world rankings for both teams`,
+    `- Recent head-to-head results between the two teams`,
+    `- Current injuries, suspensions, and key player availability for both squads`,
+    `- Any recent form or news beyond the tournament matches listed above`,
+    `Run a few focused searches, then base your analysis on what you find.`,
     knockoutNote,
     langNote,
     ``,
-    `Predict the final scoreline and explain your reasoning in 3-5 sentences,`,
-    `referencing team strengths, form, and any tactical factors. Then submit your`,
-    `prediction using the submit_prediction tool.`,
+    `When done researching, call the submit_prediction tool with the final scoreline,`,
+    `a 3-5 sentence reasoning, the FIFA rankings you found, a short head-to-head summary,`,
+    `each team's key players / availability, and 2-4 concise key factors. If you could not`,
+    `confirm a value (e.g. a ranking), leave that specific field out rather than guessing.`,
   ].join("\n");
+}
+
+interface Source {
+  title: string;
+  url: string;
+}
+
+// Pull unique web-search sources out of the assistant content blocks so the UI
+// can show where the analysis came from.
+function collectSources(blocks: Anthropic.ContentBlock[], into: Map<string, Source>): void {
+  for (const block of blocks) {
+    if (block.type !== "web_search_tool_result") continue;
+    const content = (block as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const item of content) {
+      if (
+        item &&
+        typeof item === "object" &&
+        (item as { type?: string }).type === "web_search_result"
+      ) {
+        const url = (item as { url?: string }).url;
+        const title = (item as { title?: string }).title;
+        if (url && !into.has(url)) {
+          into.set(url, { title: title || url, url });
+        }
+      }
+    }
+  }
 }
 
 export async function POST(request: Request) {
@@ -149,85 +185,238 @@ export async function POST(request: Request) {
       ? [match.team1, match.team2]
       : [match.team1, match.team2, "Draw"];
 
-  try {
-    const response = await anthropic.messages.create({
-      model: model.id,
-      max_tokens: 1024,
-      tools: [
-        {
-          name: "submit_prediction",
-          description: "Submit the predicted result of the match.",
-          input_schema: {
-            type: "object",
-            properties: {
-              score1: {
-                type: "integer",
-                minimum: 0,
-                description: `Predicted goals for ${match.team1}`,
-              },
-              score2: {
-                type: "integer",
-                minimum: 0,
-                description: `Predicted goals for ${match.team2}`,
-              },
-              winner: {
-                type: "string",
-                enum: winnerEnum,
-                description: "The team you expect to advance/win, or Draw for group games.",
-              },
-              confidence: {
-                type: "integer",
-                minimum: 0,
-                maximum: 100,
-                description: "Confidence in this prediction, 0-100.",
-              },
-              reasoning: {
-                type: "string",
-                description: "3-5 sentence explanation of the prediction.",
-              },
-            },
-            required: ["score1", "score2", "winner", "confidence", "reasoning"],
-          },
+  const submitTool: Anthropic.Tool = {
+    name: "submit_prediction",
+    description: "Submit the predicted result of the match.",
+    input_schema: {
+      type: "object",
+      properties: {
+        score1: {
+          type: "integer",
+          minimum: 0,
+          description: `Predicted goals for ${match.team1}`,
         },
-      ],
-      tool_choice: { type: "tool", name: "submit_prediction" },
-      messages: [{ role: "user", content: buildPrompt(schedule, match, lang) }],
-    });
+        score2: {
+          type: "integer",
+          minimum: 0,
+          description: `Predicted goals for ${match.team2}`,
+        },
+        winner: {
+          type: "string",
+          enum: winnerEnum,
+          description: "The team you expect to advance/win, or Draw for group games.",
+        },
+        confidence: {
+          type: "integer",
+          minimum: 0,
+          maximum: 100,
+          description: "Confidence in this prediction, 0-100.",
+        },
+        reasoning: {
+          type: "string",
+          description: "3-5 sentence explanation of the prediction.",
+        },
+        team1Ranking: {
+          type: "integer",
+          minimum: 1,
+          description: `Current FIFA world ranking for ${match.team1}. Omit if unknown.`,
+        },
+        team2Ranking: {
+          type: "integer",
+          minimum: 1,
+          description: `Current FIFA world ranking for ${match.team2}. Omit if unknown.`,
+        },
+        headToHead: {
+          type: "string",
+          description:
+            "Short summary of recent head-to-head results between the two teams. Omit if unknown.",
+        },
+        keyPlayers1: {
+          type: "string",
+          description: `Key players and injury/suspension availability for ${match.team1}. Omit if unknown.`,
+        },
+        keyPlayers2: {
+          type: "string",
+          description: `Key players and injury/suspension availability for ${match.team2}. Omit if unknown.`,
+        },
+        keyFactors: {
+          type: "array",
+          items: { type: "string" },
+          description: "2-4 concise bullet points on the decisive factors for this match.",
+        },
+      },
+      required: ["score1", "score2", "winner", "confidence", "reasoning"],
+    },
+  };
 
-    const toolUse = response.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-    );
+  const webSearchTool = {
+    type: "web_search_20250305" as const,
+    name: "web_search",
+    max_uses: 5,
+  };
 
-    if (!toolUse) {
-      return NextResponse.json(
-        { error: "The model did not return a structured prediction. Try again." },
-        { status: 502 },
-      );
-    }
+  const tools = [webSearchTool, submitTool] as Anthropic.ToolUnion[];
 
-    const prediction = toolUse.input as {
-      score1: number;
-      score2: number;
-      winner: string;
-      confidence: number;
-      reasoning: string;
-    };
+  const encoder = new TextEncoder();
 
-    const result = {
-      matchId: match.id,
-      model: { key: model.key, label: model.label, id: model.id },
-      team1: match.team1,
-      team2: match.team2,
-      prediction,
-    };
+  // Stream progress as newline-delimited JSON so the UI can show each research
+  // step (web searches) live while the model works, then the final result.
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let closed = false;
+      const send = (event: Record<string, unknown>) => {
+        if (closed) return;
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
 
-    setPrediction(match.id, modelKey, lang, result);
+      const messages: Anthropic.MessageParam[] = [
+        { role: "user", content: buildPrompt(schedule, match, lang) },
+      ];
+      const sources = new Map<string, Source>();
 
-    return NextResponse.json({ ...result, cached: false });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    const status =
-      err instanceof Anthropic.APIError && typeof err.status === "number" ? err.status : 502;
-    return NextResponse.json({ error: `Prediction failed: ${message}` }, { status });
-  }
+      // Run one streaming turn, emitting a progress event for every web search
+      // the model issues, and return the fully assembled message.
+      const runTurn = async (
+        turnTools: Anthropic.ToolUnion[],
+        toolChoice?: Anthropic.MessageCreateParams["tool_choice"],
+      ): Promise<Anthropic.Message> => {
+        const s = anthropic.messages.stream({
+          model: model.id,
+          max_tokens: 2048,
+          tools: turnTools,
+          ...(toolChoice ? { tool_choice: toolChoice } : {}),
+          messages,
+        });
+
+        let blockType: string | null = null;
+        let blockName: string | null = null;
+        let blockJson = "";
+        for await (const ev of s) {
+          if (ev.type === "content_block_start") {
+            blockType = ev.content_block.type;
+            blockName =
+              "name" in ev.content_block ? (ev.content_block.name as string) : null;
+            blockJson = "";
+          } else if (
+            ev.type === "content_block_delta" &&
+            ev.delta.type === "input_json_delta"
+          ) {
+            blockJson += ev.delta.partial_json;
+          } else if (ev.type === "content_block_stop") {
+            if (blockType === "server_tool_use" && blockName === "web_search") {
+              try {
+                const query = (JSON.parse(blockJson) as { query?: string }).query;
+                if (query) send({ type: "search", query });
+              } catch {
+                // Ignore unparseable partial tool input.
+              }
+            }
+            blockType = null;
+            blockName = null;
+            blockJson = "";
+          }
+        }
+        return s.finalMessage();
+      };
+
+      try {
+        send({ type: "status", stage: "researching" });
+
+        let response = await runTurn(tools);
+        collectSources(response.content, sources);
+
+        // The web-search server tool can pause the turn while it runs; feed the
+        // partial turn back until the model finishes its research and answers.
+        let guard = 0;
+        while (response.stop_reason === "pause_turn" && guard < 6) {
+          messages.push({ role: "assistant", content: response.content });
+          response = await runTurn(tools);
+          collectSources(response.content, sources);
+          guard += 1;
+        }
+
+        let toolUse = response.content.find(
+          (block): block is Anthropic.ToolUseBlock =>
+            block.type === "tool_use" && block.name === "submit_prediction",
+        );
+
+        send({ type: "status", stage: "finalizing" });
+
+        // If the model researched but stopped without submitting, ask it to submit.
+        if (!toolUse) {
+          messages.push({ role: "assistant", content: response.content });
+          messages.push({
+            role: "user",
+            content: "Now submit your prediction using the submit_prediction tool.",
+          });
+          response = await runTurn([submitTool], {
+            type: "tool",
+            name: "submit_prediction",
+          });
+          toolUse = response.content.find(
+            (block): block is Anthropic.ToolUseBlock =>
+              block.type === "tool_use" && block.name === "submit_prediction",
+          );
+        }
+
+        if (!toolUse) {
+          send({
+            type: "error",
+            error: "The model did not return a structured prediction. Try again.",
+          });
+          return;
+        }
+
+        const raw = toolUse.input as {
+          score1: number;
+          score2: number;
+          winner: string;
+          confidence: number;
+          reasoning: string;
+          team1Ranking?: number;
+          team2Ranking?: number;
+          headToHead?: string;
+          keyPlayers1?: string;
+          keyPlayers2?: string;
+          keyFactors?: unknown;
+        };
+
+        // The model occasionally returns keyFactors as a single string instead
+        // of an array; normalize so the client can always treat it as string[].
+        const keyFactors = Array.isArray(raw.keyFactors)
+          ? raw.keyFactors.filter((f): f is string => typeof f === "string")
+          : typeof raw.keyFactors === "string" && raw.keyFactors.trim()
+            ? [raw.keyFactors.trim()]
+            : undefined;
+
+        const prediction = { ...raw, keyFactors };
+
+        const result = {
+          matchId: match.id,
+          model: { key: model.key, label: model.label, id: model.id },
+          team1: match.team1,
+          team2: match.team2,
+          prediction,
+          sources: Array.from(sources.values()).slice(0, 8),
+        };
+
+        setPrediction(match.id, modelKey, lang, result);
+
+        send({ type: "result", result: { ...result, cached: false } });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        send({ type: "error", error: `Prediction failed: ${message}` });
+      } finally {
+        closed = true;
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+    },
+  });
 }

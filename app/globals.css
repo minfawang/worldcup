@@ -35,6 +35,10 @@
 }
 
 @layer utilities {
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
   .thin-scroll::-webkit-scrollbar {
     height: 8px;
     width: 8px;
@@ -47,5 +51,22 @@
   }
   .thin-scroll::-webkit-scrollbar-track {
     background: transparent;
+  }
+  /* Softly fade the top/bottom edges of a scroll area instead of a hard cut. */
+  .scroll-fade-y {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 20px,
+      #000 calc(100% - 20px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 20px,
+      #000 calc(100% - 20px),
+      transparent 100%
+    );
   }
 }

@@ -59,11 +59,19 @@ type Dict = {
   opusDesc: string;
   predictBtn: string;
   predicting: string;
+  stepResearching: string;
+  stepSearching: string;
+  stepFinalizing: string;
   savedNote: string;
   winnerPrefix: string;
   drawText: string;
   confidence: string;
   reasoning: string;
+  rankLabel: string;
+  keyFactorsLabel: string;
+  h2hLabel: string;
+  squadLabel: string;
+  sourcesLabel: string;
   viaPrefix: string;
   viaSuffix: string;
   teamCol: string;
@@ -99,11 +107,19 @@ export const DICT: Record<Lang, Dict> = {
     opusDesc: "Deepest reasoning",
     predictBtn: "Predict result",
     predicting: "Predicting…",
+    stepResearching: "Researching both teams…",
+    stepSearching: "Searching: ",
+    stepFinalizing: "Analyzing findings & finalizing prediction…",
     savedNote: "Showing a saved prediction for this match & model.",
     winnerPrefix: "Winner: ",
     drawText: "Predicted draw",
     confidence: "Confidence",
     reasoning: "Reasoning",
+    rankLabel: "FIFA rank",
+    keyFactorsLabel: "Key factors",
+    h2hLabel: "Head-to-head",
+    squadLabel: "Squad & availability",
+    sourcesLabel: "Sources",
     viaPrefix: "via ",
     viaSuffix: "",
     teamCol: "Team",
@@ -136,11 +152,19 @@ export const DICT: Record<Lang, Dict> = {
     opusDesc: "最强推理能力",
     predictBtn: "预测比分",
     predicting: "预测中…",
+    stepResearching: "正在研究双方球队…",
+    stepSearching: "搜索：",
+    stepFinalizing: "正在分析资料并生成预测…",
     savedNote: "显示该比赛与模型的已保存预测结果。",
     winnerPrefix: "胜者：",
     drawText: "预测为平局",
     confidence: "信心指数",
     reasoning: "分析理由",
+    rankLabel: "FIFA 排名",
+    keyFactorsLabel: "关键因素",
+    h2hLabel: "历史交锋",
+    squadLabel: "阵容与伤停",
+    sourcesLabel: "信息来源",
     viaPrefix: "由 ",
     viaSuffix: " 生成",
     teamCol: "球队",

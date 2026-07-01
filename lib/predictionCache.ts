@@ -1,6 +1,11 @@
 import type { ModelKey } from "./models";
 import type { Lang } from "./i18n";
 
+export interface PredictionSource {
+  title: string;
+  url: string;
+}
+
 export interface PredictionResult {
   matchId: number;
   model: { key: ModelKey; label: string; id: string };
@@ -12,7 +17,14 @@ export interface PredictionResult {
     winner: string;
     confidence: number;
     reasoning: string;
+    team1Ranking?: number;
+    team2Ranking?: number;
+    headToHead?: string;
+    keyPlayers1?: string;
+    keyPlayers2?: string;
+    keyFactors?: string[];
   };
+  sources?: PredictionSource[];
 }
 
 // Cache predictions per match + model for the lifetime of the server process.
