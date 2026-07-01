@@ -14,6 +14,25 @@ interface PredictBody {
   lang?: string;
 }
 
+// Read-only lookup: returns a cached prediction if one exists, without ever
+// calling Claude. Used by the UI to auto-display saved predictions on open.
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const matchId = Number(searchParams.get("matchId"));
+  const model = searchParams.get("model");
+  const lang: Lang = searchParams.get("lang") === "zh" ? "zh" : "en";
+
+  if (!Number.isInteger(matchId) || !isModelKey(model)) {
+    return NextResponse.json({ cached: false }, { status: 200 });
+  }
+
+  const cached = getPrediction(matchId, model, lang);
+  if (cached) {
+    return NextResponse.json({ ...cached, cached: true });
+  }
+  return NextResponse.json({ cached: false });
+}
+
 function recentForm(schedule: Schedule, team: string, exceptId: number): string {
   const games = schedule.matches
     .filter(

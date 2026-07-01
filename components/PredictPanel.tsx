@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WCMatch } from "@/lib/worldcup";
 import { MODEL_LIST, type ModelKey } from "@/lib/models";
 import { flagFor } from "@/lib/flags";
@@ -31,6 +31,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
   const { t, lang, team, round, group } = useLanguage();
   const [model, setModel] = useState<ModelKey>("sonnet");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Keep results per model + language so toggling reuses what we already have.
   const [results, setResults] = useState<Record<string, PredictResponse>>({});
@@ -38,10 +39,41 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
   const resultKey = `${model}:${lang}`;
   const result = results[resultKey] ?? null;
 
+  const resultsRef = useRef(results);
+  resultsRef.current = results;
+
   const modelDesc: Record<ModelKey, string> = {
     sonnet: t("sonnetDesc"),
     opus: t("opusDesc"),
   };
+
+  // On open / model / language change, look up a server-cached prediction and
+  // show it directly (no button, no extra Claude call) if one exists.
+  useEffect(() => {
+    if (resultsRef.current[resultKey]) {
+      setChecking(false);
+      return;
+    }
+    let cancelled = false;
+    setChecking(true);
+    fetch(
+      `/api/predict?matchId=${match.id}&model=${model}&lang=${lang}`,
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.cached && data?.prediction) {
+          setResults((prev) => ({ ...prev, [resultKey]: data as PredictResponse }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [match.id, model, lang, resultKey]);
 
   async function runPrediction() {
     setLoading(true);
@@ -138,7 +170,13 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
             </div>
           </div>
 
-          {!result && (
+          {!result && checking && (
+            <div className="flex items-center justify-center py-3 text-slate-400">
+              <span className="animate-spin text-pitch-400">↻</span>
+            </div>
+          )}
+
+          {!result && !checking && (
             <button
               type="button"
               onClick={runPrediction}
