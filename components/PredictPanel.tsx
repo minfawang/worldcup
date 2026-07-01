@@ -177,21 +177,23 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 backdrop-blur-md sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="glass-strong flex max-h-[calc(100dvh-2rem)] w-full max-w-lg animate-scale-in flex-col overflow-hidden rounded-3xl shadow-card"
+        className="glass-strong flex max-h-[92dvh] w-full max-w-lg animate-slide-up flex-col overflow-hidden rounded-t-3xl shadow-card sm:max-h-[calc(100dvh-2rem)] sm:animate-scale-in sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative shrink-0 border-b border-white/5 bg-white/[0.02] p-6">
+        <div className="relative shrink-0 border-b border-white/5 bg-white/[0.02] p-5 sm:p-6">
+          {/* Drag-handle affordance for the mobile bottom sheet. */}
+          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pitch-400/60 to-transparent" />
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-pitch-300">
                 {match.stage === "group" ? group(match.group) : round(match.round)}
               </p>
-              <h2 className="mt-2 flex flex-wrap items-center gap-x-2 text-xl font-semibold text-white">
+              <h2 className="mt-2 flex flex-wrap items-center gap-x-2 text-lg font-semibold text-white sm:text-xl">
                 <span className="whitespace-nowrap">
                   {flagFor(match.team1)} {team(match.team1)}
                 </span>
@@ -204,7 +206,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="-mr-1.5 -mt-1.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
               aria-label="Close"
             >
               ✕
@@ -212,7 +214,7 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
           </div>
         </div>
 
-        <div className="thin-scroll scroll-fade-y flex-1 overflow-y-auto overscroll-contain p-6">
+        <div className="thin-scroll scroll-fade-y flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
           <div className="mb-5">
             <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.15em] text-slate-500">
               {t("model")}
@@ -306,8 +308,8 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
 
           {result && (
             <div className="mt-5 space-y-5 animate-fade-in-up">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                <div className="flex items-center justify-center gap-5 text-center">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+                <div className="flex items-center justify-center gap-3 text-center sm:gap-5">
                   <div className="flex-1">
                     <div className="text-3xl">{flagFor(result.team1)}</div>
                     <div className="mt-1 truncate text-xs text-slate-400">{team(result.team1)}</div>
@@ -317,9 +319,9 @@ export default function PredictPanel({ match, onClose }: PredictPanelProps) {
                       </div>
                     )}
                   </div>
-                  <div className="text-4xl font-bold tabular-nums text-white">
+                  <div className="text-3xl font-bold tabular-nums text-white sm:text-4xl">
                     <span className="text-gradient">{result.prediction.score1}</span>
-                    <span className="mx-2 text-slate-600">-</span>
+                    <span className="mx-1.5 text-slate-600 sm:mx-2">-</span>
                     <span className="text-gradient">{result.prediction.score2}</span>
                   </div>
                   <div className="flex-1">

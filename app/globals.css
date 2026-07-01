@@ -9,9 +9,16 @@
 }
 
 @layer base {
+  html {
+    /* Avoid unwanted horizontal scroll from decorative blurred blobs on small
+       screens, and keep sizing predictable. */
+    @apply overflow-x-hidden;
+  }
   body {
-    @apply bg-[#05070e] text-slate-200 antialiased;
+    @apply overflow-x-hidden bg-[#05070e] text-slate-200 antialiased;
     font-family: var(--font-body);
+    /* Kill the grey tap flash on iOS/Android for a more app-like feel. */
+    -webkit-tap-highlight-color: transparent;
   }
   h1,
   h2,
@@ -51,6 +58,13 @@
   }
   .thin-scroll::-webkit-scrollbar-track {
     background: transparent;
+  }
+  /* Nudge horizontally-scrolling rows to rest on a column edge on touch. */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+  }
+  .snap-start {
+    scroll-snap-align: start;
   }
   /* Softly fade the top/bottom edges of a scroll area instead of a hard cut. */
   .scroll-fade-y {

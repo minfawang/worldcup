@@ -74,8 +74,8 @@ export default function Home() {
   ).padStart(2, "0")}`;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <header className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      <header className="mb-8 flex flex-col gap-5 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
         <div className="animate-fade-in-up">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-pitch-300 backdrop-blur">
             <span className="relative flex h-1.5 w-1.5">
@@ -84,7 +84,7 @@ export default function Home() {
             </span>
             {t("liveBadge")}
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl">
             <span className="text-gradient">{t("titleMain")}</span>
             <span className="ml-2 font-light text-slate-400">{t("titleSuffix")}</span>
           </h1>
@@ -127,7 +127,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mb-8 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8">
         <div className="glass inline-flex rounded-2xl p-1">
           <TabButton active={tab === "groups"} onClick={() => setTab("groups")}>
             {t("groups")}

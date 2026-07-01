@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
 
@@ -6,6 +6,15 @@ export const metadata: Metadata = {
   title: "World Cup Predictor 2026",
   description:
     "Visualize the 2026 FIFA World Cup schedule and bracket, and predict upcoming matches with Claude.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#05070e",
+  width: "device-width",
+  initialScale: 1,
+  // Allow content to extend into the notch/home-indicator areas so we can
+  // pad with env(safe-area-inset-*) where it matters (e.g. the bottom sheet).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
