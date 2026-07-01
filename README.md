@@ -8,7 +8,7 @@ Claude, with a switch between the Sonnet and Opus models.
 
 - Live 2026 World Cup schedule + bracket, fetched from the public
   [openfootball](https://github.com/openfootball/worldcup.json) dataset (no API key needed).
-- Manual **Refresh** button to re-fetch the latest fixtures/results.
+- Auto-refreshes the latest fixtures/results every 10 minutes, with a live countdown to the next refresh.
 - Group-stage view (12 groups with mini standings) and a knockout bracket view.
 - Select any upcoming match and predict the result with Claude.
 - Toggle between **Claude Sonnet** and **Claude Opus** in the UI.

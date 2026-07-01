@@ -15,6 +15,8 @@ interface ScheduleResponse {
   data: Schedule;
 }
 
+const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+
 export default function Home() {
   const { t, lang, setLang, locale } = useLanguage();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -24,6 +26,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("bracket");
   const [selected, setSelected] = useState<WCMatch | null>(null);
+  const [nextRefreshAt, setNextRefreshAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async (refresh: boolean) => {
     if (refresh) setRefreshing(true);
@@ -48,7 +52,26 @@ export default function Home() {
     load(false);
   }, [load]);
 
+  useEffect(() => {
+    setNextRefreshAt(Date.now() + REFRESH_INTERVAL_MS);
+    const id = setInterval(() => {
+      load(true);
+      setNextRefreshAt(Date.now() + REFRESH_INTERVAL_MS);
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [load]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const upcomingCount = schedule?.matches.filter((m) => m.predictable).length ?? 0;
+
+  const remainingMs = nextRefreshAt ? Math.max(0, nextRefreshAt - now) : 0;
+  const countdown = `${Math.floor(remainingMs / 60000)}:${String(
+    Math.floor((remainingMs % 60000) / 1000)
+  ).padStart(2, "0")}`;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -84,23 +107,23 @@ export default function Home() {
               </button>
             ))}
           </div>
-          {fetchedAt && (
-            <span className="hidden text-xs text-slate-500 sm:inline">
-              {t("updatedPrefix")}
-              {new Date(fetchedAt).toLocaleTimeString(locale)}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => load(true)}
-            disabled={refreshing || loading}
-            className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-slate-100 backdrop-blur transition hover:border-pitch-400/50 hover:shadow-glow disabled:opacity-60"
-          >
-            <span className={`text-pitch-400 ${refreshing ? "animate-spin" : "transition group-hover:rotate-180"}`}>
-              ↻
-            </span>
-            {refreshing ? t("refreshing") : t("refresh")}
-          </button>
+          <span className="hidden items-center gap-1.5 text-xs text-slate-500 sm:inline-flex">
+            <span className={`text-slate-600 ${refreshing ? "inline-block animate-spin" : ""}`}>↻</span>
+            {refreshing ? (
+              t("refreshing")
+            ) : (
+              <span>
+                {t("nextRefreshPrefix")}
+                <span className="tabular-nums">{countdown}</span>
+              </span>
+            )}
+            {fetchedAt && (
+              <span className="text-slate-600">
+                · {t("updatedPrefix")}
+                {new Date(fetchedAt).toLocaleTimeString(locale)}
+              </span>
+            )}
+          </span>
         </div>
       </header>
 

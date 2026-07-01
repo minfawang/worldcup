@@ -45,6 +45,7 @@ type Dict = {
   updatedPrefix: string;
   refresh: string;
   refreshing: string;
+  nextRefreshPrefix: string;
   groups: string;
   bracket: string;
   loading: string;
@@ -93,6 +94,7 @@ export const DICT: Record<Lang, Dict> = {
     updatedPrefix: "Updated ",
     refresh: "Refresh",
     refreshing: "Refreshing…",
+    nextRefreshPrefix: "Next refresh in ",
     groups: "Groups",
     bracket: "Bracket",
     loading: "Loading schedule…",
@@ -138,6 +140,7 @@ export const DICT: Record<Lang, Dict> = {
     updatedPrefix: "更新于 ",
     refresh: "刷新",
     refreshing: "刷新中…",
+    nextRefreshPrefix: "下次刷新 ",
     groups: "小组赛",
     bracket: "淘汰赛",
     loading: "正在加载赛程…",
