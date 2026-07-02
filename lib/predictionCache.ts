@@ -49,6 +49,7 @@ export interface PredictionResult {
 // keeps state stable across dev hot-reloads.
 const globalCache = globalThis as unknown as {
   __wcPredictions?: Map<string, PredictionResult>;
+  __wcInflight?: Map<string, Promise<PredictionResult>>;
   __wcRedis?: Redis | null;
   __wcFileLoaded?: boolean;
   __wcWriteChain?: Promise<void>;
@@ -63,6 +64,19 @@ function memory(): Map<string, PredictionResult> {
     globalCache.__wcPredictions = new Map();
   }
   return globalCache.__wcPredictions;
+}
+
+// Tracks predictions that are currently being computed (a Claude call is in
+// flight) keyed by `matchId:model:lang`. Lets a duplicate request — e.g. the
+// user reopens the panel and clicks predict again while the first run is still
+// finishing in the background — reuse the in-flight computation instead of
+// starting a second (costly) Claude call. Lives on `globalThis` so it is shared
+// across requests within a single server instance.
+function inflightMap(): Map<string, Promise<PredictionResult>> {
+  if (!globalCache.__wcInflight) {
+    globalCache.__wcInflight = new Map();
+  }
+  return globalCache.__wcInflight;
 }
 
 // Lazily construct the Upstash Redis client from env. Returns null when it is
@@ -292,4 +306,34 @@ export async function setPrediction(
   }
 
   persistToDisk(map);
+}
+
+// Return the in-flight computation for this prediction if one is running, so a
+// duplicate request can await it instead of triggering another Claude call.
+export function getInflightPrediction(
+  matchId: number,
+  model: ModelKey,
+  lang: Lang,
+): Promise<PredictionResult> | undefined {
+  return inflightMap().get(keyFor(matchId, model, lang));
+}
+
+// Register the promise for an in-progress prediction and auto-clear it once it
+// settles (whether it resolves or rejects). The stored promise is guarded
+// against unhandled-rejection warnings for the case where no duplicate request
+// ever awaits it.
+export function registerInflightPrediction(
+  matchId: number,
+  model: ModelKey,
+  lang: Lang,
+  promise: Promise<PredictionResult>,
+): void {
+  const key = keyFor(matchId, model, lang);
+  const map = inflightMap();
+  map.set(key, promise);
+  promise
+    .catch(() => {})
+    .finally(() => {
+      if (map.get(key) === promise) map.delete(key);
+    });
 }

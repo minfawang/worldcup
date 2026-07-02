@@ -5,9 +5,12 @@ import { isModelKey, resolveModel } from "@/lib/models";
 import {
   getPrediction,
   setPrediction,
+  getInflightPrediction,
+  registerInflightPrediction,
   normalizeKeyFactors,
   normalizeScorelines,
   stripCitations,
+  type PredictionResult,
 } from "@/lib/predictionCache";
 import { LANG_NAME, type Lang } from "@/lib/i18n";
 import { findMatch, type Schedule, type WCMatch } from "@/lib/worldcup";
@@ -158,6 +161,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...cachedPrediction, cached: true });
   }
 
+  // If the same prediction is already being computed (e.g. an earlier request
+  // is still finishing in the background after the panel was closed), wait for
+  // it instead of starting a second Claude call, then return its cached result.
+  const inflight = getInflightPrediction(body.matchId, modelKey, lang);
+  if (inflight) {
+    try {
+      await inflight;
+      const done = await getPrediction(body.matchId, modelKey, lang);
+      if (done) return NextResponse.json({ ...done, cached: true });
+    } catch {
+      // The in-flight run failed; fall through to start a fresh computation.
+    }
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -284,11 +301,33 @@ export async function POST(request: Request) {
 
   const encoder = new TextEncoder();
 
+  // Expose this run to concurrent duplicate requests via the in-flight registry
+  // so they can await the same result instead of calling Claude again. Exactly
+  // one of resolve/reject fires (a finally guard rejects if neither did).
+  let resolveResult!: (r: PredictionResult) => void;
+  let rejectResult!: (e: unknown) => void;
+  const resultPromise = new Promise<PredictionResult>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+  registerInflightPrediction(body.matchId, modelKey, lang, resultPromise);
+
   // Stream progress as newline-delimited JSON so the UI can show each research
   // step (web searches) live while the model works, then the final result.
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
+      let settled = false;
+      const finish = (r: PredictionResult) => {
+        if (settled) return;
+        settled = true;
+        resolveResult(r);
+      };
+      const fail = (e: unknown) => {
+        if (settled) return;
+        settled = true;
+        rejectResult(e);
+      };
       const send = (event: Record<string, unknown>) => {
         if (closed) return;
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
@@ -449,12 +488,18 @@ export async function POST(request: Request) {
         };
 
         await setPrediction(match.id, modelKey, lang, result);
+        finish(result);
 
         send({ type: "result", result: { ...result, cached: false } });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
+        fail(err);
         send({ type: "error", error: `Prediction failed: ${message}` });
       } finally {
+        // Safety net: if we returned early without a result (e.g. the model
+        // never submitted a prediction), reject so the in-flight entry clears
+        // and duplicate requests fall back to a fresh run rather than hanging.
+        fail(new Error("Prediction did not produce a result."));
         closed = true;
         controller.close();
       }
