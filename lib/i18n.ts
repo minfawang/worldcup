@@ -60,6 +60,16 @@ type Dict = {
   opusDesc: string;
   predictBtn: string;
   predicting: string;
+  scorelinesLabel: string;
+  mostLikely: string;
+  modelPredictionsLabel: string;
+  runningModels: string;
+  modelFailed: string;
+  retryModel: string;
+  consensusLabel: string;
+  consensusFromPrefix: string;
+  consensusFromSuffix: string;
+  agreeWord: string;
   stepResearching: string;
   stepSearching: string;
   stepFinalizing: string;
@@ -107,8 +117,18 @@ export const DICT: Record<Lang, Dict> = {
     model: "Model",
     sonnetDesc: "Fast, balanced predictions",
     opusDesc: "Deepest reasoning",
-    predictBtn: "Predict result",
+    predictBtn: "Predict with all models",
     predicting: "Predicting…",
+    scorelinesLabel: "Predicted scorelines",
+    mostLikely: "Most likely",
+    modelPredictionsLabel: "Model predictions",
+    runningModels: "Running all models…",
+    modelFailed: "Prediction failed.",
+    retryModel: "Retry",
+    consensusLabel: "Consensus prediction",
+    consensusFromPrefix: "Merged from ",
+    consensusFromSuffix: " models",
+    agreeWord: "agree",
     stepResearching: "Researching both teams…",
     stepSearching: "Searching: ",
     stepFinalizing: "Analyzing findings & finalizing prediction…",
@@ -153,8 +173,18 @@ export const DICT: Record<Lang, Dict> = {
     model: "模型",
     sonnetDesc: "快速、均衡的预测",
     opusDesc: "最强推理能力",
-    predictBtn: "预测比分",
+    predictBtn: "用所有模型预测",
     predicting: "预测中…",
+    scorelinesLabel: "预测比分",
+    mostLikely: "最可能",
+    modelPredictionsLabel: "模型预测",
+    runningModels: "正在运行所有模型…",
+    modelFailed: "预测失败。",
+    retryModel: "重试",
+    consensusLabel: "综合预测",
+    consensusFromPrefix: "综合自 ",
+    consensusFromSuffix: " 个模型",
+    agreeWord: "个模型一致",
     stepResearching: "正在研究双方球队…",
     stepSearching: "搜索：",
     stepFinalizing: "正在分析资料并生成预测…",

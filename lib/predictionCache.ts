@@ -9,16 +9,23 @@ export interface PredictionSource {
   url: string;
 }
 
+/** One candidate final scoreline with the probability the model assigns it. */
+export interface Scoreline {
+  score1: number;
+  score2: number;
+  /** Probability (0-100) the model assigns to this exact scoreline. */
+  confidence: number;
+}
+
 export interface PredictionResult {
   matchId: number;
   model: { key: ModelKey; label: string; id: string };
   team1: string;
   team2: string;
   prediction: {
-    score1: number;
-    score2: number;
+    /** Top scorelines the model considers most likely, sorted by confidence. */
+    scorelines: Scoreline[];
     winner: string;
-    confidence: number;
     reasoning: string;
     team1Ranking?: number;
     team2Ranking?: number;
@@ -26,6 +33,11 @@ export interface PredictionResult {
     keyPlayers1?: string;
     keyPlayers2?: string;
     keyFactors?: string[];
+    // Legacy single-scoreline fields kept optional so older cached predictions
+    // still read/normalize cleanly into `scorelines`.
+    score1?: number;
+    score2?: number;
+    confidence?: number;
   };
   sources?: PredictionSource[];
 }
@@ -135,11 +147,96 @@ export function normalizeKeyFactors(raw: unknown): string[] | undefined {
   return factors.length > 0 ? factors : undefined;
 }
 
-// Apply keyFactors normalization to a stored/loaded prediction in place-safe
-// manner, returning the same object with cleaned keyFactors.
+// Coerce whatever the model (or an older cached record) produced into a clean,
+// sorted list of at most three scorelines. Falls back to the legacy single
+// score fields so predictions cached before the multi-scoreline change keep
+// rendering. Returns an empty array only when nothing usable is present.
+export function normalizeScorelines(
+  raw: unknown,
+  legacy?: { score1?: number; score2?: number; confidence?: number },
+): Scoreline[] {
+  const clampScore = (n: unknown): number | null => {
+    const v = Math.trunc(Number(n));
+    return Number.isFinite(v) && v >= 0 ? v : null;
+  };
+  const clampConf = (n: unknown): number => {
+    const v = Math.round(Number(n));
+    if (!Number.isFinite(v)) return 0;
+    return Math.min(100, Math.max(0, v));
+  };
+
+  const list: Scoreline[] = [];
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const s1 = clampScore((item as { score1?: unknown }).score1);
+      const s2 = clampScore((item as { score2?: unknown }).score2);
+      if (s1 === null || s2 === null) continue;
+      list.push({
+        score1: s1,
+        score2: s2,
+        confidence: clampConf((item as { confidence?: unknown }).confidence),
+      });
+    }
+  }
+
+  // Fall back to the legacy single-scoreline shape when no array was provided.
+  if (list.length === 0 && legacy) {
+    const s1 = clampScore(legacy.score1);
+    const s2 = clampScore(legacy.score2);
+    if (s1 !== null && s2 !== null) {
+      list.push({ score1: s1, score2: s2, confidence: clampConf(legacy.confidence) });
+    }
+  }
+
+  // De-duplicate identical scorelines, keeping the highest confidence.
+  const byKey = new Map<string, Scoreline>();
+  for (const s of list) {
+    const key = `${s.score1}-${s.score2}`;
+    const existing = byKey.get(key);
+    if (!existing || s.confidence > existing.confidence) byKey.set(key, s);
+  }
+
+  return [...byKey.values()]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 3);
+}
+
+// Claude's web_search sometimes wraps sentences in citation markup like
+// <cite index="12-5">...</cite>. Strip the tags (keeping the inner text) so the
+// UI shows clean prose. Applied to every free-text field on write and read.
+export function stripCitations(text: string | undefined): string | undefined {
+  if (typeof text !== "string") return text;
+  const cleaned = text
+    .replace(/<\/?cite\b[^>]*>/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+// Apply keyFactors + scorelines normalization and citation stripping to a
+// stored/loaded prediction, returning a new object safe for the UI to render.
 function normalizePrediction(result: PredictionResult): PredictionResult {
-  const keyFactors = normalizeKeyFactors(result.prediction?.keyFactors);
-  return { ...result, prediction: { ...result.prediction, keyFactors } };
+  const keyFactors = (normalizeKeyFactors(result.prediction?.keyFactors) ?? [])
+    .map((f) => stripCitations(f))
+    .filter((f): f is string => Boolean(f));
+  const scorelines = normalizeScorelines(result.prediction?.scorelines, {
+    score1: result.prediction?.score1,
+    score2: result.prediction?.score2,
+    confidence: result.prediction?.confidence,
+  });
+  return {
+    ...result,
+    prediction: {
+      ...result.prediction,
+      reasoning: stripCitations(result.prediction?.reasoning) ?? "",
+      headToHead: stripCitations(result.prediction?.headToHead),
+      keyPlayers1: stripCitations(result.prediction?.keyPlayers1),
+      keyPlayers2: stripCitations(result.prediction?.keyPlayers2),
+      keyFactors: keyFactors.length > 0 ? keyFactors : undefined,
+      scorelines,
+    },
+  };
 }
 
 export async function getPrediction(

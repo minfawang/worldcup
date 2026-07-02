@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSchedule } from "@/lib/scheduleCache";
 import { isModelKey, resolveModel } from "@/lib/models";
-import { getPrediction, setPrediction, normalizeKeyFactors } from "@/lib/predictionCache";
+import {
+  getPrediction,
+  setPrediction,
+  normalizeKeyFactors,
+  normalizeScorelines,
+  stripCitations,
+} from "@/lib/predictionCache";
 import { LANG_NAME, type Lang } from "@/lib/i18n";
 import { findMatch, type Schedule, type WCMatch } from "@/lib/worldcup";
 
@@ -63,7 +69,7 @@ function buildPrompt(schedule: Schedule, match: WCMatch, lang: Lang): string {
     match.stage === "knockout"
       ? "\nThis is a knockout match, so it cannot end in a draw. If regulation time is level, decide the winner via extra time or a penalty shootout and say so in your reasoning (the winner field must be a team, not \"Draw\")."
       : "";
-  const langNote = `\nWrite every free-text field ("reasoning", "headToHead", "keyPlayers1", "keyPlayers2", and each item of "keyFactors") in ${LANG_NAME[lang]}. Keep the "winner" field exactly as one of the provided team-name options (do not translate it).`;
+  const langNote = `\nWrite every free-text field ("reasoning", "headToHead", "keyPlayers1", "keyPlayers2", and each item of "keyFactors") in ${LANG_NAME[lang]}. Keep the "winner" field exactly as one of the provided team-name options (do not translate it). Write plain prose only — do not include any citation markers or XML/HTML tags (e.g. no <cite> tags) in any field.`;
 
   return [
     `You are a football (soccer) analyst predicting a 2026 FIFA World Cup match.`,
@@ -85,10 +91,15 @@ function buildPrompt(schedule: Schedule, match: WCMatch, lang: Lang): string {
     knockoutNote,
     langNote,
     ``,
-    `When done researching, call the submit_prediction tool with the final scoreline,`,
-    `a 3-5 sentence reasoning, the FIFA rankings you found, a short head-to-head summary,`,
-    `each team's key players / availability, and 2-4 concise key factors. If you could not`,
-    `confirm a value (e.g. a ranking), leave that specific field out rather than guessing.`,
+    `When done researching, call the submit_prediction tool. Provide your THREE most`,
+    `likely exact final scorelines, ordered from most to least likely, and for each one a`,
+    `confidence = the probability (0-100) you assign to that exact scoreline actually`,
+    `happening. Distinct scorelines can each be fairly likely, so these need not sum to 100,`,
+    `but they should reflect their relative likelihood (the first must be the most likely).`,
+    `Also give the overall predicted winner, a 3-5 sentence reasoning, the FIFA rankings you`,
+    `found, a short head-to-head summary, each team's key players / availability, and 2-4`,
+    `concise key factors. If you could not confirm a value (e.g. a ranking), leave that`,
+    `specific field out rather than guessing.`,
   ].join("\n");
 }
 
@@ -191,26 +202,40 @@ export async function POST(request: Request) {
     input_schema: {
       type: "object",
       properties: {
-        score1: {
-          type: "integer",
-          minimum: 0,
-          description: `Predicted goals for ${match.team1}`,
-        },
-        score2: {
-          type: "integer",
-          minimum: 0,
-          description: `Predicted goals for ${match.team2}`,
+        scorelines: {
+          type: "array",
+          minItems: 3,
+          maxItems: 3,
+          description:
+            "Your three most likely exact final scorelines, ordered from most to least likely.",
+          items: {
+            type: "object",
+            properties: {
+              score1: {
+                type: "integer",
+                minimum: 0,
+                description: `Predicted goals for ${match.team1} in this scoreline.`,
+              },
+              score2: {
+                type: "integer",
+                minimum: 0,
+                description: `Predicted goals for ${match.team2} in this scoreline.`,
+              },
+              confidence: {
+                type: "integer",
+                minimum: 0,
+                maximum: 100,
+                description:
+                  "Probability (0-100) you assign to this exact scoreline occurring.",
+              },
+            },
+            required: ["score1", "score2", "confidence"],
+          },
         },
         winner: {
           type: "string",
           enum: winnerEnum,
-          description: "The team you expect to advance/win, or Draw for group games.",
-        },
-        confidence: {
-          type: "integer",
-          minimum: 0,
-          maximum: 100,
-          description: "Confidence in this prediction, 0-100.",
+          description: "The team you expect to advance/win overall, or Draw for group games.",
         },
         reasoning: {
           type: "string",
@@ -245,7 +270,7 @@ export async function POST(request: Request) {
           description: "2-4 concise bullet points on the decisive factors for this match.",
         },
       },
-      required: ["score1", "score2", "winner", "confidence", "reasoning"],
+      required: ["scorelines", "winner", "reasoning"],
     },
   };
 
@@ -368,10 +393,11 @@ export async function POST(request: Request) {
         }
 
         const raw = toolUse.input as {
-          score1: number;
-          score2: number;
+          scorelines?: unknown;
+          score1?: number;
+          score2?: number;
           winner: string;
-          confidence: number;
+          confidence?: number;
           reasoning: string;
           team1Ranking?: number;
           team2Ranking?: number;
@@ -381,11 +407,37 @@ export async function POST(request: Request) {
           keyFactors?: unknown;
         };
 
-        // Normalize keyFactors into a clean string[] (handles single-string and
-        // <item>-tag-packed shapes the model sometimes returns).
-        const keyFactors = normalizeKeyFactors(raw.keyFactors);
+        // Normalize the model output: strip web_search <cite> markup from every
+        // free-text field, clean keyFactors into a string[], and sort/de-dupe
+        // the scorelines (with a legacy fallback).
+        const keyFactors = (normalizeKeyFactors(raw.keyFactors) ?? [])
+          .map((f) => stripCitations(f))
+          .filter((f): f is string => Boolean(f));
+        const scorelines = normalizeScorelines(raw.scorelines, {
+          score1: raw.score1,
+          score2: raw.score2,
+          confidence: raw.confidence,
+        });
 
-        const prediction = { ...raw, keyFactors };
+        if (scorelines.length === 0) {
+          send({
+            type: "error",
+            error: "The model did not return any valid scorelines. Try again.",
+          });
+          return;
+        }
+
+        const prediction = {
+          scorelines,
+          winner: raw.winner,
+          reasoning: stripCitations(raw.reasoning) ?? "",
+          team1Ranking: raw.team1Ranking,
+          team2Ranking: raw.team2Ranking,
+          headToHead: stripCitations(raw.headToHead),
+          keyPlayers1: stripCitations(raw.keyPlayers1),
+          keyPlayers2: stripCitations(raw.keyPlayers2),
+          keyFactors: keyFactors.length > 0 ? keyFactors : undefined,
+        };
 
         const result = {
           matchId: match.id,

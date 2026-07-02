@@ -9,8 +9,10 @@ A Next.js (App Router) web app that:
 
 1. Shows the live **2026 FIFA World Cup** schedule as a group-stage view (12
    groups with mini standings) and a knockout **bracket** view.
-2. Lets a visitor pick any **predictable upcoming match** and have **Claude**
-   predict the scoreline + reasoning, choosing between **Sonnet** and **Opus**.
+2. Lets a visitor pick any **predictable upcoming match** and have **all Claude
+   models (Sonnet + Opus) run in parallel**, each returning its **top 3 most
+   likely scorelines with per-scoreline confidence** plus reasoning. The panel
+   visualizes each model's scorelines as confidence bars side by side.
 3. Is fully **bilingual (English / 简体中文)** with auto-detection from the
    browser and a manual toggle.
 
@@ -66,13 +68,15 @@ lib/
 
 ## Prediction flow (app/api/predict/route.ts)
 
-`POST /api/predict` with `{ matchId, model, lang }`:
+`POST /api/predict` with `{ matchId, model, lang }` runs **one** model. The
+client fires one request **per model in parallel** (see `PredictPanel.tsx`) so
+all models predict at once; each request:
 
 1. Return cached prediction (keyed by `matchId:model:lang`) if present — no Claude call.
 2. Validate: `matchId` exists, teams are decided (not placeholders), `ANTHROPIC_API_KEY` set.
 3. Build a prompt with tournament form + instructions to use `web_search`.
 4. Stream a Claude turn; loop while `stop_reason === "pause_turn"` (web search pauses the turn), up to a guard limit.
-5. Force a `submit_prediction` tool call (structured output: score1/score2/winner/confidence/reasoning + optional rankings, H2H, key players, keyFactors).
+5. Force a `submit_prediction` tool call (structured output: `scorelines` = top 3 `{score1, score2, confidence}` ordered most→least likely, plus winner/reasoning + optional rankings, H2H, key players, keyFactors). `normalizeScorelines` (in `predictionCache.ts`) sorts/de-dupes/caps to 3 and falls back to the legacy single-scoreline shape for old cached records.
 6. Persist result and emit it. Knockout matches cannot be "Draw" (winner enum excludes it).
 
 Response is **newline-delimited JSON (NDJSON)** streamed to the client. Event
